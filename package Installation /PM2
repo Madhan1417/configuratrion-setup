@@ -1,0 +1,80 @@
+i need to delete my pm2 and install again
+
+Got it 👍 let’s do a clean reset of PM2 properly (this will fix any weird state issues).
+
+🔥 Step 1: Stop & delete all PM2 processes
+
+pm2 stop all
+pm2 delete all
+
+🔥 Step 2: Kill PM2 daemon completely
+
+pm2 kill
+
+🔥 Step 3: Uninstall PM2 globally
+
+npm uninstall -g pm2
+
+🔥 Step 4: Reinstall fresh PM2
+
+npm install -g pm2
+
+🔥 Step 5: Start your app cleanly
+
+cd /opt/files
+pm2 start server.js --name my-app
+
+🔍 Step 6: Verify it's running
+pm2 status
+
+👉 You should see:
+
+my-app   online
+
+🔥 Step 7: Test Node directly (VERY IMPORTANT)
+
+curl http://localhost:4000/api/health
+
+👉 Must return JSON like:
+
+{"status":"ok"}
+🔥 Step 8: Test NGINX
+curl http://localhost
+
+👉 Should now return your website ✅
+
+🔥 Step 9: Make PM2 persistent (auto start after reboot)
+pm2 save
+pm2 startup
+
+👉 It will give a command like:
+
+sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root
+
+👉 Copy-paste and run that command
+
+🧠 Pro Tip (important)
+
+If anything fails, check logs:
+
+pm2 logs
+🎯 Final Checklist
+Check	Command
+App running	pm2 status
+Node working	curl localhost:4000/api/health
+NGINX working	curl localhost
+🚀 After this
+
+You’ll have:
+
+✅ Clean PM2
+✅ Stable Node app
+✅ Working NGINX reverse proxy
+
+If you still face issue after this, don’t debug randomly — just send:
+
+pm2 status
+pm2 logs --lines 20
+curl http://localhost:4000/api/health
+
+I’ll fix it instantly 👍
