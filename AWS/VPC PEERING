@@ -1,0 +1,96 @@
+Why this note is important
+
+When working in AWS, it’s very common to create:
+
+One VPC for bastion (public access)
+Another VPC for secure/private workloads
+
+By default, these VPCs are completely isolated — even inside the same account.
+
+👉 That’s why this issue happens:
+
+SSH works within same VPC ✅
+SSH fails across VPCs ❌ (even if SG + keypair are correct)
+
+So this note helps you remember:
+
+“Whenever two VPCs need to communicate → I must configure peering + routing + security”
+
+🧠 Scenario
+VPC-1 (Bastion) → 10.0.0.0/16
+VPC-2 (Private EC2) → 10.1.0.0/16
+
+Goal:
+👉 Bastion → SSH → Private EC2 (in another VPC)
+
+✅ Step-by-Step Process (Follow This Always)
+🔹 STEP 1: Create VPC Peering
+Go to VPC Dashboard
+Click Peering Connections
+Click Create Peering Connection
+Select:
+Requester → Bastion VPC
+Accepter → Private VPC
+Create
+🔹 STEP 2: Accept Peering
+Go to Peering Connections
+Select request
+Click:
+👉 Actions → Accept Request
+
+✅ Status must be: Active
+
+🔥 STEP 3: Update Route Tables (MOST IMPORTANT)
+
+Without this → ❌ NOTHING works
+
+🟦 Bastion VPC Route Table (Public RT)
+
+Add route:
+
+Destination: 10.1.0.0/16
+Target: VPC Peering (pcx-xxxx)
+🟩 Private VPC Route Table (Private RT)
+
+Add route:
+
+Destination: 10.0.0.0/16
+Target: VPC Peering (pcx-xxxx)
+🔐 STEP 4: Security Group Configuration
+On Private EC2:
+Type: SSH
+Port: 22
+Source: 10.0.0.0/16   (Bastion VPC CIDR)
+🔹 STEP 5: (Optional but Important) NACL Check
+
+Make sure:
+
+Inbound → Allow SSH + ephemeral ports (1024–65535)
+Outbound → Allow ALL
+🧪 STEP 6: Test Connectivity
+
+From bastion:
+
+ping 10.1.x.x
+ssh -i key.pem ubuntu@10.1.x.x
+🚨 Common Mistakes (VERY IMPORTANT)
+
+❌ Only creating peering → not enough
+❌ Forgetting route tables ← MOST COMMON ISSUE
+❌ Using wrong route table (not attached to subnet)
+❌ Wrong CIDR in routes
+❌ Security group blocking SSH
+
+🧠 Quick Mental Checklist
+
+Whenever SSH fails across VPC:
+
+✔ Peering = Active
+✔ Route (VPC-1 → VPC-2)
+✔ Route (VPC-2 → VPC-1)
+✔ SG allows correct CIDR
+✔ Correct subnet route table
+
+🎯 One-line Summary
+
+Two VPCs cannot communicate by default — you must enable it using VPC Peering + Route Tables + Security Groups
