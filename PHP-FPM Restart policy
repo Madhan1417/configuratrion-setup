@@ -24,7 +24,6 @@ RestartSec=5s
 MemoryMax=1.5G
 
 KillSignal=SIGQUIT
-WatchdogSec=30s
 
 CPUQuota=80%
 
