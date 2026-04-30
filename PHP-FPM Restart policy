@@ -21,8 +21,6 @@ StartLimitBurst=10
 Restart=always
 RestartSec=5s
 
-MemoryMax=1.5G
-
 KillSignal=SIGQUIT
 
 CPUQuota=80%
@@ -77,24 +75,9 @@ means: this parameter only Allows max 10 restart attempts in that interval. This
 
 
 
-* MemoryMax=1.5G
-
-Importance of this parameter: 
-
-PHP-FPM cannot use more than 1.5GB RAM. alos this one Limits PHP-FPM memory usage so it cannot crash the server....
-
-
-
 * KillSignal=SIGQUIT
 
 benefit : This parameter Gives PHP-FPM time to finish active requests before stopping....
-
-
-* WatchdogSec=30s
-
-benefit of adding this parameter : 
-
-If PHP-FPM hangs or becomes unresponsive, system detects it and restarts it!! even this will Detects frozen PHP-FPM and Auto-restarts if stuck.
 
 
 * CPUQuota=80%
@@ -136,10 +119,8 @@ StartLimitBurst=10
 Restart=always
 RestartSec=5s
 
-MemoryMax=1.5G
 
 KillSignal=SIGQUIT
-WatchdogSec=30s
 
 CPUQuota=80%
 
