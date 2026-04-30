@@ -130,12 +130,12 @@ Now let's see how to implement this policy step by step :
 Step 1: Open systemd override safely (NEVER edit main file) by using this command : 
 
 
-systemctl edit php-fpm82
+sudo systemctl edit php8.3-fpm
 
 
 This command will opens a secure override file that located in this path :
 
-/etc/systemd/system/php-fpm82.service.d/override.conf
+/etc/systemd/system/php8.3-fpm.service.d/override.conf
 
 
 
