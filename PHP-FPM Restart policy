@@ -1,0 +1,327 @@
+The Old Restart Policy :
+
+
+[Service]
+Restart=always
+RestartSec=5s
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+______________________________________
+
+
+The New Restart Policy For PHP-FPM : 
+
+
+[Service]
+
+Restart=always
+RestartSec=5s
+
+StartLimitIntervalSec=120
+StartLimitBurst=10
+StartLimitAction=none
+
+MemoryMax=1.5G
+OOMPolicy=restart
+
+KillSignal=SIGQUIT
+
+WatchdogSec=30s
+
+CPUQuota=80%
+
+
+---------------------------------------------
+
+Now let's see this new restart policy Benefit's and Behaviour/!!!\
+
+
+My old Restart policy only covers :
+
+Simple restart on crash
+Risk of restart loops
+No memory control
+
+
+But this new Restart policy covers:
+
+- Controlled restart recovery
+- No infinite crash loops
+- Auto recovery from OOM kill
+- Memory-safe execution
+- System-level health monitoring
+- Production stability under load spikes
+
+
+Now let's see each parameter explanation : 
+------------------------------------------
+
+* Restart=always
+
+This means : If PHP-FPM stops for any reason, systemd brings it back automatically.
+
+
+
+* RestartSec=5s 
+
+This parameters means : Adds a small delay before restart to avoid repeated crash loops
+
+
+
+* StartLimitIntervalSec=120
+
+Simple explanation: Detects repeated crashes quickly and Helps to control unstable service behaviour
+
+
+
+* StartLimitBurst=10
+
+means: this parameter only Allows max 10 restart attempts in that interval. This will Prevents infinite restart loop, and also Protects CPU from overload.
+
+
+* StartLimitAction=none 
+
+Benefit of adding this parameter: 
+Even if it crashes too much, system won’t permanently shut it down, it Still allows manual recovery...
+
+
+* MemoryMax=1.5G
+
+Importance of this parameter: 
+
+PHP-FPM cannot use more than 1.5GB RAM. alos this one Limits PHP-FPM memory usage so it cannot crash the server....
+
+
+* OOMPolicy=restart
+
+Benefit of this parameter: 
+
+If Linux kills PHP-FPM due to memory (OOM killer), systemd restarts it automatically, there's no Auto recovery after memory crash, No manual intervention needed... this parameter will take care.... 
+
+
+* KillSignal=SIGQUIT
+
+benefit : This parameter Gives PHP-FPM time to finish active requests before stopping....
+
+
+* WatchdogSec=30s
+
+benefit of adding this parameter : 
+
+If PHP-FPM hangs or becomes unresponsive, system detects it and restarts it!! even this will Detects frozen PHP-FPM and Auto-restarts if stuck.
+
+
+* CPUQuota=80%
+
+benefit : Stops PHP-FPM from consuming full CPU and affecting other services, also this can Prevents CPU spikes and Protects NGINX / DB / OS...!!!
+
+
+
+
+____________________________________________________________________________________________
+
+
+
+Now let's see how to implement this policy step by step : 
+---------------------------------------------------------
+
+
+Step 1: Open systemd override safely (NEVER edit main file) by using this command : 
+
+
+systemctl edit php-fpm82
+
+
+This command will opens a secure override file that located in this path :
+
+/etc/systemd/system/php-fpm82.service.d/override.conf
+
+
+
+Step 2: Paste This full policy :
+
+
+
+[Service]
+
+Restart=always
+RestartSec=5s
+
+StartLimitIntervalSec=120
+StartLimitBurst=10
+StartLimitAction=none
+
+MemoryMax=1.5G
+OOMPolicy=restart
+
+KillSignal=SIGQUIT
+
+WatchdogSec=30s
+
+CPUQuota=80%
+
+
+
+After paste this file, then Save and exit...
+
+
+
+_________X___________X_______________X___________X__________________X
+
+
+Now the Seconnd step : 
+-----------------------
+
+
+* Apply systemd changes and Reload systemd manager by using this commands.
+
+systemctl daemon-reexec
+
+systemctl daemon-reload
+
+
+These two commands will, Reloads system rules and Applies override without reboot.
+
+
+
+* Restart PHP-FPM by using this command :
+
+
+systemctl restart php-fpm82
+
+
+
+
+_____________X________________X_____________X____________________X____________________
+
+
+
+Now the Third step process : 
+----------------------------
+
+
+Basically systemd overrides do NOT need special permissions, but This one ensure safety:
+
+
+Step one Check correct file permissions by this command : 
+
+
+ls -l /etc/systemd/system/php-fpm82.service.d/
+
+
+Expected Result:
+
+drwxr-xr-x  (directory)
+-rw-r--r-- override.conf
+
+
+Step 2: Fix permissions if needed 
+
+
+chmod 644 /etc/systemd/system/php-fpm82.service.d/override.conf
+
+
+Meaning:
+
+root can edit this file, system can read safely, no execution needed for any of them... 
+
+
+
+
+____________X___________________X___________________X________________________X________
+
+
+4. How to VERIFY everything is working Perfectly :
+
+
+Execute this command : 
+
+systemctl show php-fpm82 | grep -E "Restart|Memory|CPU|Tasks|OOM"
+
+
+Expected output includes:
+
+Restart=always
+MemoryMax=1.5G
+CPUQuota=80%
+OOMPolicy=restart
+
+
+
+Next Step : Verify full applied config by using this command :
+
+
+systemctl cat php-fpm82
+
+
+You should see:
+
+main service file
+AND the override section at bottom, that we edited.
+
+
+_________________X__________________X__________________X___________________X_____________
+
+
+
+5. The Finel Real TEST :
+
+
+Simulate crash by using this command...
+
+
+pkill -9 php-fpm
+
+
+
+Next Step: Watch auto recovery by using this command...
+
+
+systemctl status php-fpm82
+
+
+Expected behavior:
+
+Service stops
+Restarts automatically in ~5 seconds
+No manual intervention needed
+
+
+Finel Step: Check logs (proof it worked)
+
+execute this command : 
+
+
+journalctl -u php-fpm82 -n 50 --no-pager
+
+
+
+Look for:
+
+“Main process exited”
+“Restarting service”
+“Started PHP-FPM”
+
+
+____________X_____________________X____________________X_________________________X________
+
+
+
+
+Last process : How to confirm FULL stability.!!
+
+
+Run This Command :
+
+systemctl is-active php-fpm82
+
+
+Should return:
+
+active
+
+
+
+
+
