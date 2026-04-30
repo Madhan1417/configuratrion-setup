@@ -207,9 +207,8 @@ sudo systemctl show php8.3-fpm | grep -E "Restart|Memory|CPU|Tasks|OOM"
 Expected output includes:
 
 Restart=always
-MemoryMax=1.5G
 CPUQuota=80%
-OOMPolicy=restart
+
 
 
 
