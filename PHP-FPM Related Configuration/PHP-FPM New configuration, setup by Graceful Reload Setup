@@ -1,0 +1,253 @@
+Zero-downtime PHP-FPM Config change Steps and Actions :
+—------------------------------------------------------------------------------------
+
+
+Important Reality (before we start)
+Switching:
+dynamic → static
+means:
+all 24 workers are created immediately on start
+restart timing matters
+bad restart = brief downtime
+So we must reload gracefully, not restart blindly.
+
+
+Niw Let’s do this process step by Step : 
+—------------------------------------------------------
+
+Step 1 — Locate PHP-FPM config : 
+
+
+Depends on your PHP version. So know the PHP version by executing this command.
+ps aux | grep php-fpm
+Then after the command execution You’ll see something like:
+php-fpm: master process (/etc/php/8.1/fpm/php-fpm.conf)
+
+
+
+Common paths:
+/etc/php/8.1/fpm/pool.d/www.conf
+/etc/php/7.4/fpm/pool.d/www.conf
+Your changes go in pool config, not global config.
+
+
+
+Step 2 – Take backup of the old Config details (This is MANDATORY Process) : 
+
+sudo cp /etc/php/8.1/fpm/pool.d/www.conf /etc/php/8.1/fpm/pool.d/www.conf.bak
+
+
+
+
+
+Step 3 — Now Edit configuration file by using this command: 
+
+
+sudo nano /etc/php/8.1/fpm/pool.d/www.conf
+
+
+
+
+
+
+Then Update these values:
+
+
+; PROCESS MANAGER
+pm = static
+pm.max_children = 24
+
+; COMMENT these (not used in static mode, but still im adding these parameter, incase if we decided to switch into dynamic mode)
+; pm.start_servers
+; pm.min_spare_servers
+; pm.max_spare_servers
+
+; LIFECYCLE
+pm.max_requests = 300
+
+; MEMORY
+php_admin_value[memory_limit] = 1480M
+
+
+Important:
+Always Use php_admin_value inside pool config (This will overrides php.ini safely)
+
+
+
+
+
+Step 4 — Validate config (CRITICAL) : 
+—--------------------------------------------------
+Never skip this Steps.
+
+sudo php-fpm8.1 -t
+(or)
+
+sudo php-fpm -t
+
+Expected result is :
+configuration file ... test is successful
+
+If error → DO NOT reload
+
+
+
+Step 5 — Graceful reload (ZERO downtime)
+
+
+sudo systemctl reload php8.1-fpm
+
+NOT restart the process, 
+Just Use reload
+
+Let’s see What reload does Really :
+keeps old workers running
+spins up new workers with new config
+transitions smoothly
+No dropped requests
+
+If reload not supported (This is rare Scenario, but still, if reload, didn’t happened, use this command)
+Fallback:
+sudo service php8.1-fpm reload
+
+
+
+Step 6 — Verify new config is active : 
+
+
+1. Check process count : 
+
+
+ps -ylC php-fpm --sort:rss
+
+You should see the result like :
+
+
+~24 worker processes
+all active (static mode)
+
+2. Count workers : 
+
+
+ps aux | grep php-fpm | grep -v grep | wc -l
+
+
+
+Expected Result after execute this COmmand :
+
+
+1 master + 24 workers ≈ 25 processes
+
+
+
+
+3. Check memory per worker : 
+
+
+ps -o pid,rss,cmd -C php-fpm --sort=-rss | head
+
+Confirm:
+not all instantly huge
+memory grows per request (normal)
+
+
+4. Now Confirm Whether the config loaded is Loaded or Not By using this command : 
+
+
+grep pm /etc/php/8.1/fpm/pool.d/www.conf
+
+5. Then Finely Check logs : 
+
+
+sudo tail -f /var/log/php8.1-fpm.log
+Look for:
+errors 
+worker spawn messages 
+
+
+Step 7 — Live traffic validation (VERY IMPORTANT) : 
+
+
+Immediately after deployed, The New Configuration :
+
+First Watch CPU + memory Status : 
+
+
+Htop
+
+
+Check:
+RAM usage stable (< 26GB)
+no sudden spikes
+
+
+
+Then Watch request handling : 
+
+
+netstat -anp | grep php
+|
+or if behind nginx:
+tail -f /var/log/nginx/access.log
+
+Ensure:
+no spike in 5xx errors
+
+
+Now Check queueing Status : 
+
+If nginx:
+tail -f /var/log/nginx/error.log
+
+Look for:
+upstream timed out
+connection refused
+
+
+
+
+
+Step 8 — Post-deploy observation (THIS is where most fail) : 
+Watch for 30–60 mins:
+
+Warning signs:
+memory creeping up continuously
+workers stuck at high RSS
+increasing response time
+
+What changes after static mode?
+Before (dynamic):
+workers scale
+safer for memory bursts
+After (static):
+fixed 24 workers
+predictable memory
+less flexible under spikes
+
+
+
+
+Risk you must monitor : 
+If:
+6–8 workers become heavy (1.3GB)
+remaining workers handle all traffic
+
+You may see:
+queueing
+latency increase
+
+This was Optional (but STRONGLY recommended) : 
+
+Add safety Config, PHP Config :
+request_terminate_timeout = 300s
+Then reload again.
+
+Rollback plan (if anything goes wrong) : 
+
+
+sudo cp /etc/php/8.1/fpm/pool.d/www.conf.bak /etc/php/8.1/fpm/pool.d/www.conf
+—-------------
+
+sudo systemctl reload php8.1-fpm
+This takes Back to previous config instantly…..
+
