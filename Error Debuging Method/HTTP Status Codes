@@ -1,0 +1,63 @@
+HTTP Status Codes — Big Picture
+
+They’re grouped like this:
+
+✅ 1xx — Informational
+Request received, still processing
+✅ 2xx — Success
+Everything worked
+Code	Meaning
+200	OK
+201	Created
+204	No Content
+⚠️ 3xx — Redirection
+Client needs to take another action
+Code	Meaning
+301	Moved Permanently
+302	Found (temporary redirect)
+304	Not Modified
+🚫 4xx — Client Errors (IMPORTANT for your case)
+
+👉 Problem is with the request, not the server
+
+Code	Meaning :
+
+400	Bad Request (invalid input)
+401	Unauthorized (authentication required or failed)
+403	Forbidden (you are authenticated, but not allowed)
+404	Not Found
+405	Method Not Allowed
+408	Request Timeout
+429	Too Many Requests
+💥 5xx — Server Errors
+
+👉 Problem is on the server side
+
+Code	Meaning
+500	Internal Server Error
+502	Bad Gateway
+503	Service Unavailable
+504	Gateway Timeout
+🎯 Your Scenario (401)
+
+You said:
+
+teammate hit URL with different parameters → got 401
+
+👉 What 401 actually means:
+
+Request reached server ✅
+Server understood it ✅
+But authentication failed or missing ❌
+
+🔍 Common reasons for 401
+Missing Authorization header
+Invalid token / API key
+Expired token
+Wrong auth format (e.g., Bearer missing)
+Endpoint requires login but request is anonymous
+⚠️ Difference that confuses everyone
+🔹 401 vs 403
+Code	Meaning
+401	"Who are you?" (not authenticated)
+403	"I know you, but you’re not allowed"
