@@ -1,0 +1,367 @@
+Basic Git Workflow
+Working Directory
+       ↓
+git add
+       ↓
+Staging Area
+       ↓
+git commit
+       ↓
+Local Repository
+       ↓
+git push
+       ↓
+GitHub / Remote Repo
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+📁 1. Initialize Git : 
+
+
+FIrst Create Git repo in current folder : 
+
+git init
+
+📌 Use this command when:
+
+Starting Git tracking for a project.
+
+📌 Example:
+
+You downloaded or created a project and want Git enabled.
+
+_______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+👤 2. Configure Git : 
+
+This is command to Set username New Mechine or ennvironment : 
+
+git config --global user.name "Madhan"
+
+Next step Set email : 
+
+git config --global user.email "yourmail@gmail.com"
+
+Check config : 
+
+git config --list
+
+📌 Use when:
+First-time setup.
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🔍 3. Check Status : 
+
+git status
+
+📌it Shows:
+
+Modified files
+Untracked files
+Staged files
+
+📌 Use constantly.
+
+This is one of the MOST used commands.
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+➕ 4. Add Files to Staging : 
+
+if want to Add one file use this command : 
+
+git add index.js
+
+
+if want to Add all files current directory use this one :
+
+git add .
+
+
+📌 Use when:
+
+You want Git to prepare files for commit.
+
+_________________________________________________________________________________________________________________________________________________________________________________________
+
+
+💾 5. Commit Changes : 
+
+git commit -m "Added login feature"
+
+📌 Use when:
+
+You completed a logical change or feature.
+
+🧠 Think of commit as:
+
+📸 A snapshot of your project.
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+📜 6. View Commit History : 
+
+git log
+
+Short version : 
+
+git log --oneline
+
+📌 Use when:
+
+use this command if You want to see previous commits/history.
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🔗 7. Connect GitHub Repository : 
+
+Use this command to Add remote Repo in Local Before using push in first time : 
+
+git remote add origin https://github.com/username/repo.git
+
+
+Then verify the Repo you're going to push by using this command : 
+
+git remote -v
+
+
+📌 Use when:
+
+Connecting local project to GitHub.
+
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🚀 8. Push Code to GitHub : 
+
+First push : 
+
+git push -u origin main
+
+Normal push later :
+
+git push 
+
+📌 Use when:
+
+Uploading commits to GitHub.
+
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+📥 9. Pull Latest Changes : 
+
+git pull 
+
+Better version 
+
+git pull origin main --rebase
+
+📌 Use when:
+
+Before starting work OR before pushing to repo.
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+📦 10. Clone Existing Repository : 
+
+git clone https://github.com/user/repo.git 
+
+📌 Use when:
+
+Downloading project from GitHub.
+
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+
+🌿 11. Branch Commands : 
+
+Create branch :
+
+git branch feature-login
+
+
+use this command for Switch branch :
+
+git checkout feature-login
+
+
+This is simple and combined command for Create + switch together :
+
+git checkout -b feature-login
+
+
+This command is for Show branches : 
+
+git branch
+
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+🔀 12. Merge Branch : 
+
+git merge feature-login
+
+📌 Use when:
+
+Combining feature branch into main branch.
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+❌ 13. Remove Changes : 
+
+Discard file changes : 
+
+git checkout -- file.txt
+
+Remove staged file : 
+
+git reset file.txt
+
+
+Reset everything ::
+
+git reset --hard
+
+( ⚠️ Dangerous — removes changes permanently.)
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+
+⏪ 14. Undo Commits
+
+Undo last commit but keep changes : 
+
+git reset --soft HEAD~1
+
+Completely remove last commit : 
+
+git reset --hard HEAD~1
+
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🔄 15. Rebase
+
+git pull origin main --rebase
+
+OR
+
+git rebase main
+
+📌 Use when:
+
+Keeping clean commit history.
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🧹 16. Stash Changes : 
+
+Save temporary work : 
+
+git stash
+
+if you want to Restore it use this command :
+
+git stash pop
+
+📌 Use when:
+
+Need to switch branches without committing unfinished work.
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🏷️ 17. Tags :::
+
+Create tag : 
+
+git tag v1.0
+
+
+Push tags :
+
+git push --tags
+
+
+📌 Use when:
+
+Creating releases.
+
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🔐 18. SSH Setup (Better than HTTPS) :::
+
+Generate SSH key for Github Push : 
+
+ssh-keygen -t ed25519 -C "yourmail@gmail.com"
+
+Start SSH agent : 
+
+eval "$(ssh-agent -s)"
+
+
+Add key : 
+
+ssh-add ~/.ssh/id_ed25519
+
+📌 Use when:
+
+Avoiding PAT/password every push.
+
+( still there's permission command and test command needs to include this list )
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+
+📊 19. See Differences :::
+
+Show unstaged changes : 
+
+git diff
+
+Show staged changes : 
+
+git diff --staged
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+🔥 20. Force Push :::
+
+git push --force
+
+⚠️ But this is Dangerous Because it will Overwrites remote history (( mostly don't use this command in office environment )).... 
+
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
