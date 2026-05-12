@@ -1,0 +1,211 @@
+Azure Storage Account Creation & Blob Operations Using Azure CLI
+
+1. Azure CLI Installation & Setup : 
+Description:
+ Installed Azure CLI on the local machine to interact with Azure cloud services using command-line interface.
+Steps Performed:
+Installed Azure CLI using Winget package manager
+Verified installation using version command
+Restarted terminal to apply environment changes
+Commands Used:
+winget install -e --id Microsoft.AzureCLI
+
+
+az version
+Outcome:
+ Azure CLI successfully installed and verified, enabling cloud resource management from terminal.
+
+
+
+
+
+
+
+
+2. Azure Account Login & Subscription Verification
+Description:
+ Authenticated into Azure account and verified active subscription.
+Steps Performed:
+Logged into Azure account using browser authentication
+Verified active subscription details
+Listed available subscriptions
+Commands Used:
+az login
+
+
+az account show
+
+az account list --output table
+Outcome:
+ Successfully authenticated and confirmed correct Azure subscription for deployment.
+
+
+
+
+3. Resource Group Creation
+Description:
+ Created a logical container (Resource Group) to organize all Azure resources.
+Azure Resource Group
+Steps Performed:
+Defined resource group name and region
+Created resource group in Azure
+Commands Used:
+az group create --name rg-storage-demo --location eastus
+Outcome:
+ Resource group successfully created to manage all storage-related resources.
+
+
+
+
+
+
+
+4. Storage Account Creation
+Description:
+ Created a Storage Account to store unstructured data like blobs.
+Azure Storage Account
+Steps Performed:
+Generated unique storage account name
+Created storage account with Standard_LRS replication
+Enabled StorageV2 (general-purpose v2 account)
+Commands Used:
+az storage account create `
+ --name storagedemo1234 `
+ --resource-group rg-storage-demo `
+ --location eastus `
+ --sku Standard_LRS `
+ --kind StorageV2
+Outcome:
+ Storage account successfully created for blob data operations.
+
+
+
+
+
+5. Blob Container Creation
+Description:
+ Created a private blob container to store uploaded files.
+Azure Blob Storage
+Steps Performed:
+Retrieved storage account access key
+Created container with private access level
+Commands Used:
+az storage container create `
+  --name $containerName `
+  --account-name $storageAccount `
+  --account-key $storageKey `
+  --public-access off
+
+Outcome:
+ Blob container successfully created to store uploaded files securely.
+
+
+6. Local File Creation
+Description:
+ Created two text files locally using PowerShell for upload to Azure Blob Storage.
+Steps Performed:
+Created working directory on local machine
+Generated two text files with sample content
+Commands Used:
+mkdir C:\Users\DELL\Downloads\RealityworksAI\azure-downloads -Force
+
+Set-Content "C:\azure-files\file1.txt" "Hello Azure File 1"
+Set-Content "C:\azure-files\file2.txt" "Hello Azure File 2"
+Outcome:
+ Two local text files created successfully for cloud upload.
+
+
+
+
+7. Upload Files to Azure Blob Storage
+Description:
+ Uploaded local files to Azure Blob Storage container.
+Azure Blob Storage
+Steps Performed:
+Uploaded file1.txt to blob container
+Uploaded file2.txt to blob container
+Used storage account key authentication
+Commands Used:
+az storage blob upload `
+  --account-name $storageAccount `
+  --account-key $storageKey `
+  --container-name $containerName `
+  --file "C:\Users\DELL\Downloads\RealityworksAI\azure-files\file1.txt" `
+  --name "file1.txt"
+
+
+
+
+
+
+az storage blob upload `
+  --account-name $storageAccount `
+  --account-key $storageKey `
+  --container-name $containerName `
+  --file "C:\Users\DELL\Downloads\RealityworksAI\azure-files\file2.txt" `
+  --name "file2.txt"
+
+Outcome:
+ Files successfully uploaded and stored in Azure Blob Storage.
+
+
+8. File Modification & Overwrite
+Description:
+ Updated local files and re-uploaded them to Azure Blob Storage, overwriting existing blobs.
+Steps Performed:
+Modified content of local text files
+Re-uploaded files using same blob names
+Enabled overwrite option
+Commands Used:
+notepad C:\Users\DELL\Downloads\RealityworksAI\azure-downloads\file1.txt
+
+notepad C:\Users\DELL\Downloads\RealityworksAI\azure-downloads\file2.txt
+
+After the File Editing process UPload the latest changes in the Blob Storage : 
+
+az storage blob upload `
+  --account-name $storageAccount `
+  --account-key $storageKey `
+  --container-name $containerName `
+  --file "C:\Users\DELL\Downloads\RealityworksAI\azure-downloads\file1.txt" `
+  --name "file1.txt" `
+  --overwrite true
+
+
+Outcome:
+ Existing blobs were successfully overwritten with updated file content.
+
+
+
+9. Download Files from Azure Blob Storage
+Description:
+ Downloaded files from Azure Blob Storage to local machine.
+Azure Blob Storage
+Steps Performed:
+Created local download directory
+Downloaded blobs from container
+Verified downloaded files
+Commands Used:
+mkdir C:\azure-downloads
+
+az storage blob download `
+  --account-name $storageAccount `
+  --account-key $storageKey `
+  --container-name $containerName `
+  --name "file1.txt" `
+  --file "C:\Users\DELL\Downloads\RealityworksAI\azure-downloads\file1.txt"
+
+
+az storage blob download `
+  --account-name $storageAccount `
+  --account-key $storageKey `
+  --container-name $containerName `
+  --name "file2.txt" `
+  --file "C:\Users\DELL\Downloads\RealityworksAI\azure-downloads\file2.txt"
+
+
+Outcome:
+ Files successfully downloaded and verified locally from Azure.
+
+
+
