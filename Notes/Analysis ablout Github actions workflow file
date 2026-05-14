@@ -1,0 +1,870 @@
+
+​name: Build and Deploy HS-Online-AI
+
+on:
+  push:
+    branches:
+      - main      # Deploys to prod
+      - qa        # Deploys to qa
+      - dev       # Deploys to dev
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/deploy-app.yml'
+ 
+ pull_request:
+    branches:
+      - main
+      - qa
+      - dev
+    types: [opened, synchronize, reopened]
+
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - dev
+          - qa
+          - test
+          - prod
+
+# OIDC permissions for Azure authentication
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  AZURE_CONTAINER_REGISTRY: acrall1rwai
+  BACKEND_IMAGE: hsbackimage
+  BACKEND_IMAGE_TAG: v1
+  FRONTEND_IMAGE: hsfrontimage
+  FRONTEND_IMAGE_TAG: v1
+
+jobs:
+  # Run backend tests
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+        continue-on-error: true  # TODO: Fix upstream lint issues
+
+      - name: Run Unit Tests
+        working-directory: backend
+        run: npm run test -- --ci --coverage --maxWorkers=2 --json --outputFile=test-results.json
+        continue-on-error: true  # TODO: Fix upstream test failures
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: backend/test-results.json
+          retention-days: 7
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+          retention-days: 7
+
+  # Run frontend tests
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+        continue-on-error: true  # TODO: Fix upstream lint issues
+
+      - name: Run Unit Tests 
+        working-directory: frontend
+        run: npm run test -- --ci --coverage --maxWorkers=2 --json --outputFile=test-results.json
+        continue-on-error: true  # TODO: Fix upstream test failures
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-test-results
+          path: frontend/test-results.json
+          retention-days: 7
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          retention-days: 7
+
+  # Report test results (runs after tests complete)
+  test-report:
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Download Backend Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend
+        continue-on-error: true
+
+      - name: Download Frontend Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-test-results
+          path: frontend
+        continue-on-error: true
+
+      - name: Generate Test Summary
+        if: always()
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          for dir in backend frontend; do
+            if [ -f "$dir/test-results.json" ]; then
+              echo "### $dir" >> $GITHUB_STEP_SUMMARY
+              
+              # Parse Jest JSON output
+              TOTAL=$(jq '.numTotalTests // 0' "$dir/test-results.json" 2>/dev/null || echo "0")
+              PASSED=$(jq '.numPassedTests // 0' "$dir/test-results.json" 2>/dev/null || echo "0")
+              FAILED=$(jq '.numFailedTests // 0' "$dir/test-results.json" 2>/dev/null || echo "0")
+              PENDING=$(jq '.numPendingTests // 0' "$dir/test-results.json" 2>/dev/null || echo "0")
+              SUCCESS=$(jq '.success // false' "$dir/test-results.json" 2>/dev/null || echo "false")
+              
+              if [ "$SUCCESS" == "true" ]; then
+                echo "✅ **All tests passed**" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "❌ **Some tests failed**" >> $GITHUB_STEP_SUMMARY
+              fi
+              
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+              echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+              echo "| Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+              echo "| Failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+              echo "| Pending | $PENDING |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "### $dir" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ No test results found" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+  # ============================================================================
+  # PR Preview Environment - Deploy ephemeral environments for pull requests
+  # ============================================================================
+
+  # Determine which environment to deploy to
+  # Branch mapping: main -> prod, qa -> qa, dev -> dev
+  # Only runs on push events (not PRs) - tests alone run on PRs
+  set-environment:
+    if: github.event_name != 'pull_request'
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      resource_group: ${{ steps.set-env.outputs.resource_group }}
+      container_app: ${{ steps.set-env.outputs.container_app }}
+      frontend_container_app: ${{ steps.set-env.outputs.frontend_container_app }}
+      backend_domain: ${{ steps.set-env.outputs.backend_domain }}
+      frontend_domain: ${{ steps.set-env.outputs.frontend_domain }}
+      image_base_url: ${{ steps.set-env.outputs.image_base_url }}
+      sariweb_backend: ${{ steps.set-env.outputs.sariweb_backend }}
+      key_vault: ${{ steps.set-env.outputs.key_vault }}
+      storage_account: ${{ steps.set-env.outputs.storage_account }}
+    steps:
+      - name: Set Environment Variables
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            ENV="prod"
+          elif [ "${{ github.ref }}" == "refs/heads/qa" ]; then
+            ENV="qa"
+          elif [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+            ENV="dev"
+          elif [[ "${{ github.ref }}" == "refs/heads/test" || "${{ github.ref }}" == refs/heads/test/* ]]; then
+            ENV="test"
+          else
+            echo "::error::Unknown branch for deployment"
+            exit 1
+          fi
+          
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          
+          # Test environment uses hsoaia prefix, others use rwai
+          if [ "$ENV" == "test" ]; then
+            PREFIX="hsoaia"
+          else
+            PREFIX="rwai"
+          fi
+          
+          echo "resource_group=ARG-${ENV}1-${PREFIX}" >> $GITHUB_OUTPUT
+          echo "container_app=aca-${ENV}1-${PREFIX}-back" >> $GITHUB_OUTPUT
+          echo "frontend_container_app=aca-${ENV}1-${PREFIX}-front" >> $GITHUB_OUTPUT
+          echo "key_vault=akv${ENV}1${PREFIX}" >> $GITHUB_OUTPUT
+          echo "storage_account=asa${ENV}1${PREFIX}" >> $GITHUB_OUTPUT
+          
+          case $ENV in
+            dev)
+              echo "backend_domain=dev.tutorpatientbe.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "frontend_domain=dev.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "image_base_url=https://dev.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "sariweb_backend=https://dev.sari.realityworksai.com" >> $GITHUB_OUTPUT
+              ;;
+            qa)
+              echo "backend_domain=qa.tutorpatientbe.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "frontend_domain=qa.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "image_base_url=https://qa.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "sariweb_backend=https://qa.sari.realityworksai.com" >> $GITHUB_OUTPUT
+              ;;
+            stage)
+              echo "backend_domain=stage.tutorpatientbe.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "frontend_domain=stage.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "image_base_url=https://stage.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "sariweb_backend=https://stage.sari.realityworksai.com" >> $GITHUB_OUTPUT
+              ;;
+            test)
+              echo "backend_domain=test.tutorpatientbe.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "frontend_domain=test.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "image_base_url=https://test.tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "sariweb_backend=https://test.sari.realityworksai.com" >> $GITHUB_OUTPUT
+              ;;
+            prod)
+              echo "backend_domain=tutorpatientbe.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "frontend_domain=tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "image_base_url=https://tutorpatient.realityworksai.com" >> $GITHUB_OUTPUT
+              echo "sariweb_backend=https://sari.realityworksai.com" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+  # Build and deploy backend
+  build-backend:
+    if: github.event_name != 'pull_request'
+    needs: set-environment
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
+
+      - name: Get ACR Login Server
+        id: acr
+        run: |
+          # Dynamically fetch ACR login server (handles unique DNS suffixes)
+          LOGIN_SERVER=$(az acr show --name ${{ env.AZURE_CONTAINER_REGISTRY }} --query loginServer -o tsv)
+          echo "server=$LOGIN_SERVER" >> $GITHUB_OUTPUT
+          echo "ACR Login Server: $LOGIN_SERVER"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.acr.outputs.server }}/${{ env.BACKEND_IMAGE }}:${{ env.BACKEND_IMAGE_TAG }}
+            ${{ steps.acr.outputs.server }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+
+      - name: Get Storage Connection String from Key Vault
+        id: keyvault
+        run: |
+          STORAGE_CONN_STRING=$(az keyvault secret show \
+            --vault-name ${{ needs.set-environment.outputs.key_vault }} \
+            --name "AZURE-STORAGE-CONNECTION-STRING" \
+            --query "value" -o tsv 2>/dev/null || echo "")
+          
+          if [ -z "$STORAGE_CONN_STRING" ]; then
+            # Fallback: get connection string directly from storage account
+            STORAGE_CONN_STRING=$(az storage account show-connection-string \
+              --name ${{ needs.set-environment.outputs.storage_account }} \
+              --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+              --query connectionString -o tsv)
+          fi
+          
+          echo "::add-mask::$STORAGE_CONN_STRING"
+          echo "storage_connection_string=$STORAGE_CONN_STRING" >> $GITHUB_OUTPUT
+
+      - name: Set Container App Secrets
+        run: |
+          az containerapp secret set \
+            --name ${{ needs.set-environment.outputs.container_app }} \
+            --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+            --secrets "azure-storage-connection-string=${{ steps.keyvault.outputs.storage_connection_string }}"
+
+      - name: Deploy to Container App
+        run: |
+          az containerapp update \
+            --name ${{ needs.set-environment.outputs.container_app }} \
+            --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+            --container-name ${{ needs.set-environment.outputs.container_app }} \
+            --image ${{ steps.acr.outputs.server }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
+            --set-env-vars \
+              "FRONTEND_URL=https://${{ needs.set-environment.outputs.frontend_domain }}" \
+              "PORT=4000" \
+              "CONVERSATION_PROVIDER=ai" \
+              "AI_MODEL=gpt-4o" \
+              "REDIS_HOST=localhost" \
+              "REDIS_PORT=6379" \
+              "AZURE_BLOB_CONTAINER_NAME=json-data" \
+              "AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string"
+
+      - name: Force HTTPS Redirect
+        run: |
+          az containerapp ingress update \
+            --name ${{ needs.set-environment.outputs.container_app }} \
+            --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+            --allow-insecure false
+
+      - name: Verify Deployment
+        run: |
+          # Wait for deployment to stabilize
+          sleep 30
+          
+          # Check container app status
+          STATUS=$(az containerapp show \
+            --name ${{ needs.set-environment.outputs.container_app }} \
+            --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+            --query "properties.runningStatus" -o tsv)
+          
+          echo "Container App Status: $STATUS"
+          
+          if [ "$STATUS" != "Running" ]; then
+            echo "::warning::Container app may not be running properly"
+          fi
+
+  # Build and deploy frontend (Container App)
+  build-frontend:
+    if: github.event_name != 'pull_request'
+    needs: [set-environment, build-backend]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
+
+      - name: Get ACR Login Server
+        id: acr
+        run: |
+          LOGIN_SERVER=$(az acr show --name ${{ env.AZURE_CONTAINER_REGISTRY }} --query loginServer -o tsv)
+          echo "server=$LOGIN_SERVER" >> $GITHUB_OUTPUT
+          echo "ACR Login Server: $LOGIN_SERVER"
+
+      - name: Get App Insights Connection String from Key Vault
+        id: appinsights
+        run: |
+          APPINSIGHTS_CONN=$(az keyvault secret show \
+            --vault-name ${{ needs.set-environment.outputs.key_vault }} \
+            --name "APPINSIGHTS-CONNECTION-STRING" \
+            --query "value" -o tsv 2>/dev/null || echo "")
+          echo "::add-mask::$APPINSIGHTS_CONN"
+          echo "connection_string=$APPINSIGHTS_CONN" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.acr.outputs.server }}/${{ env.FRONTEND_IMAGE }}:${{ env.FRONTEND_IMAGE_TAG }}
+            ${{ steps.acr.outputs.server }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://${{ needs.set-environment.outputs.backend_domain }}/api
+            NEXT_PUBLIC_SARIWEB_BACKEND=${{ needs.set-environment.outputs.sariweb_backend }}
+            NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${{ vars.CLOUDINARY_CLOUD_NAME || 'dfpxpjlhl' }}
+            NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=${{ vars.CLOUDINARY_UPLOAD_PRESET || 'Reality_Works_assests' }}
+            NEXT_PUBLIC_LOCAL_AVATAR_URL=${{ vars.LOCAL_AVATAR_URL || '' }}
+            NEXT_PUBLIC_IMAGE_BASE_URL=${{ needs.set-environment.outputs.image_base_url }}
+            NEXT_PUBLIC_APPINSIGHTS_CONNECTION_STRING=${{ steps.appinsights.outputs.connection_string || '' }}
+
+      - name: Deploy to Container App
+        run: |
+          az containerapp update \
+            --name ${{ needs.set-environment.outputs.frontend_container_app }} \
+            --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+            --image ${{ steps.acr.outputs.server }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+
+      - name: Force HTTPS Redirect
+        run: |
+          az containerapp ingress update \
+            --name ${{ needs.set-environment.outputs.frontend_container_app }} \
+            --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+            --allow-insecure false
+
+      - name: Verify Deployment
+        run: |
+          sleep 30
+          STATUS=$(az containerapp show \
+            --name ${{ needs.set-environment.outputs.frontend_container_app }} \
+            --resource-group ${{ needs.set-environment.outputs.resource_group }} \
+            --query "properties.runningStatus" -o tsv)
+          
+          echo "Frontend Container App Status: $STATUS"
+          
+          if [ "$STATUS" != "Running" ]; then
+            echo "::warning::Frontend container app may not be running properly"
+          fi
+
+  # Run smoke tests after deployment
+  smoke-tests:
+    if: github.event_name != 'pull_request'
+    needs: [set-environment, build-frontend]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.set-environment.outputs.environment }}
+    steps:
+      - name: Health Check - Backend
+        run: |
+          BACKEND_URL="https://${{ needs.set-environment.outputs.backend_domain }}/api/docs"
+          
+          # Retry up to 5 times with 30 second intervals
+          for i in {1..5}; do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" $BACKEND_URL || echo "000")
+            if [ "$RESPONSE" == "200" ]; then
+              echo "✅ Backend health check passed"
+              break
+            fi
+            echo "Attempt $i: Backend returned $RESPONSE, retrying in 30s..."
+            sleep 30
+          done
+          
+          if [ "$RESPONSE" != "200" ]; then
+            echo "❌ Backend health check failed after 5 attempts"
+            exit 1
+          fi
+
+      - name: Health Check - Frontend
+        run: |
+          FRONTEND_URL="https://${{ needs.set-environment.outputs.frontend_domain }}"
+          
+          # Retry up to 5 times with 30 second intervals
+          # Accept 200 or 307 - Next.js returns 307 redirect to /login for unauthenticated users
+          for i in {1..5}; do
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" $FRONTEND_URL || echo "000")
+            if [ "$RESPONSE" == "200" ] || [ "$RESPONSE" == "307" ]; then
+              echo "✅ Frontend health check passed (HTTP $RESPONSE)"
+              break
+            fi
+            echo "Attempt $i: Frontend returned $RESPONSE, retrying in 30s..."
+            sleep 30
+          done
+          
+          if [ "$RESPONSE" != "200" ] && [ "$RESPONSE" != "307" ]; then
+            echo "❌ Frontend health check failed after 5 attempts"
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | https://${{ needs.set-environment.outputs.frontend_domain }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend API | https://${{ needs.set-environment.outputs.backend_domain }}/api |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ needs.set-environment.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Notify Teams of deploy outcome (success or failure)
+  # ============================================================================
+  # Posts an Adaptive Card to the configured Teams channel via the
+  # TEAMS_WEBHOOK_URL secret. Card border color reflects the environment
+  # (dev = default, qa = accent/blue, prod = warning/orange) and switches
+  # to "attention" (red) on any failure. On failure the card includes the
+  # previous SHA so a rollback can be initiated quickly via the Rollback
+  # workflow (.github/workflows/rollback.yml).
+  notify-deploy:
+    if: ${{ always() && vars.TEAMS_NOTIFICATIONS_ENABLED == 'true' && github.event_name != 'pull_request' }}
+    needs: [set-environment, build-backend, build-frontend, smoke-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine status, color, and per-step icons
+        id: status
+        run: |
+          BACKEND="${{ needs.build-backend.result }}"
+          FRONTEND="${{ needs.build-frontend.result }}"
+          SMOKE="${{ needs.smoke-tests.result }}"
+          ENV="${{ needs.set-environment.outputs.environment }}"
+
+          icon() {
+            case "$1" in
+              success)   echo "✅" ;;
+              cancelled) echo "⚪" ;;
+              skipped)   echo "⏭️" ;;
+              *)         echo "❌" ;;
+            esac
+          }
+
+          BACKEND_ICON=$(icon "$BACKEND")
+          FRONTEND_ICON=$(icon "$FRONTEND")
+          SMOKE_ICON=$(icon "$SMOKE")
+
+          if [ "$BACKEND" = "success" ] && [ "$FRONTEND" = "success" ] && [ "$SMOKE" = "success" ]; then
+            OVERALL="success"
+            TITLE="Deploy succeeded"
+            case "$ENV" in
+              prod) STYLE="warning" ;;
+              qa)   STYLE="accent" ;;
+              *)    STYLE="default" ;;
+            esac
+          elif [ "$BACKEND" = "cancelled" ] || [ "$FRONTEND" = "cancelled" ] || [ "$SMOKE" = "cancelled" ]; then
+            OVERALL="cancelled"
+            TITLE="Deploy cancelled"
+            STYLE="default"
+          else
+            OVERALL="failed"
+            TITLE="Deploy failed"
+            STYLE="attention"
+          fi
+
+          {
+            echo "overall=$OVERALL"
+            echo "title=$TITLE"
+            echo "style=$STYLE"
+            echo "backend_icon=$BACKEND_ICON"
+            echo "frontend_icon=$FRONTEND_ICON"
+            echo "smoke_icon=$SMOKE_ICON"
+          } >> $GITHUB_OUTPUT
+
+      - name: Get commit info
+        id: commit
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          # First line of commit message; fall back if not a push event
+          MSG="${{ github.event.head_commit.message }}"
+          if [ -z "$MSG" ]; then
+            MSG="(${{ github.event_name }})"
+          fi
+          MSG=$(printf '%s' "$MSG" | head -1 | sed 's/"/\\"/g')
+          {
+            echo "short_sha=$SHORT_SHA"
+            echo "message=$MSG"
+          } >> $GITHUB_OUTPUT
+
+      - name: Azure Login (OIDC)
+        if: ${{ needs.set-environment.outputs.container_app != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Look up previous SHA for rollback hint
+        id: prev
+        if: ${{ needs.set-environment.outputs.container_app != '' }}
+        continue-on-error: true
+        run: |
+          # Find the most recent revision whose image tag is NOT the current
+          # commit SHA. Works for both successful deploys (where current
+          # revision = github.sha and we want the prior one) and failed
+          # deploys (where the latest revision is still the previous SHA).
+          PREV=$(az containerapp revision list \
+            --name "${{ needs.set-environment.outputs.container_app }}" \
+            --resource-group "${{ needs.set-environment.outputs.resource_group }}" \
+            --query "sort_by([?properties.template.containers[0].image && !ends_with(properties.template.containers[0].image, ':${{ github.sha }}')], &properties.createdTime)[-1].properties.template.containers[0].image" \
+            -o tsv 2>/dev/null | sed 's/.*://' || echo "")
+          echo "Previous SHA: ${PREV:-<none>}"
+          echo "sha=$PREV" >> $GITHUB_OUTPUT
+
+      - name: Notify Teams
+        continue-on-error: true
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        run: |
+          # Conditionally include a "Run rollback" action button when we have
+          # a previous SHA AND the deploy didn't fully succeed. The button
+          # links to the workflow_dispatch page; reviewer fills env + SHA.
+          ROLLBACK_ACTION=""
+          if [ "${{ steps.status.outputs.overall }}" != "success" ] && [ -n "${{ steps.prev.outputs.sha }}" ]; then
+            ROLLBACK_ACTION=',{
+              "type": "Action.OpenUrl",
+              "title": "Run rollback (prev SHA: ${{ steps.prev.outputs.sha }})",
+              "url": "https://github.com/${{ github.repository }}/actions/workflows/rollback.yml"
+            }'
+          fi
+
+          PREV_FACT=""
+          if [ -n "${{ steps.prev.outputs.sha }}" ]; then
+            PREV_FACT=',{ "title": "Previous SHA", "value": "${{ steps.prev.outputs.sha }}" }'
+          fi
+
+          # Only include Environment / URL facts when set-environment
+          # actually succeeded (i.e. produced outputs). When the deploy was
+          # blocked by an earlier failure (tests, etc.) these would be empty
+          # and would render as "Environment: " or "https://" in the card.
+          ENV_FACT=""
+          ENV_NAME="${{ needs.set-environment.outputs.environment }}"
+          FRONTEND_DOMAIN="${{ needs.set-environment.outputs.frontend_domain }}"
+          BACKEND_DOMAIN="${{ needs.set-environment.outputs.backend_domain }}"
+
+          if [ -n "$ENV_NAME" ]; then
+            ENV_FACT=',{ "title": "Environment", "value": "'"$ENV_NAME"'" }'
+            TITLE_SUFFIX=" — $ENV_NAME"
+          else
+            TITLE_SUFFIX=" — (deploy not started)"
+          fi
+
+          URL_FACTS=""
+          if [ -n "$FRONTEND_DOMAIN" ]; then
+            URL_FACTS="$URL_FACTS"',{ "title": "Frontend URL", "value": "[https://'"$FRONTEND_DOMAIN"'](https://'"$FRONTEND_DOMAIN"')" }'
+          fi
+          if [ -n "$BACKEND_DOMAIN" ]; then
+            URL_FACTS="$URL_FACTS"',{ "title": "Backend URL", "value": "[https://'"$BACKEND_DOMAIN"'/api](https://'"$BACKEND_DOMAIN"'/api)" }'
+          fi
+
+          curl -s -o /dev/null -w "%{http_code}" -H "Content-Type: application/json" -d '{
+            "type": "message",
+            "attachments": [{
+              "contentType": "application/vnd.microsoft.card.adaptive",
+              "content": {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "body": [
+                  {
+                    "type": "Container",
+                    "style": "${{ steps.status.outputs.style }}",
+                    "items": [
+                      {
+                        "type": "TextBlock",
+                        "text": "${{ steps.status.outputs.title }}'"$TITLE_SUFFIX"'",
+                        "weight": "Bolder",
+                        "size": "Medium",
+                        "wrap": true
+                      },
+                      {
+                        "type": "TextBlock",
+                        "text": "${{ steps.commit.outputs.message }}",
+                        "isSubtle": true,
+                        "wrap": true,
+                        "spacing": "Small"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "FactSet",
+                    "facts": [
+                      { "title": "Repository",  "value": "${{ github.repository }}" }
+                      '"$ENV_FACT"',
+                      { "title": "Author",      "value": "${{ github.actor }}" },
+                      { "title": "Branch",      "value": "${{ github.ref_name }}" },
+                      { "title": "Commit",      "value": "${{ steps.commit.outputs.short_sha }}" },
+                      { "title": "Backend",     "value": "${{ steps.status.outputs.backend_icon }} build/deploy" },
+                      { "title": "Frontend",    "value": "${{ steps.status.outputs.frontend_icon }} build/deploy" },
+                      { "title": "Smoke tests", "value": "${{ steps.status.outputs.smoke_icon }}" }
+                      '"$URL_FACTS"'
+                      '"$PREV_FACT"'
+                    ]
+                  }
+                ],
+                "actions": [
+                  {
+                    "type": "Action.OpenUrl",
+                    "title": "View workflow run",
+                    "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  },
+                  {
+                    "type": "Action.OpenUrl",
+                    "title": "View commit",
+                    "url": "https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+                  }
+                  '"$ROLLBACK_ACTION"'
+                ]
+              }
+            }]
+          }' "$TEAMS_WEBHOOK_URL"
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+1. push block (runs when code is pushed)
+on:
+  push:
+👉 on:
+
+This tells GitHub:
+
+“Here are the events that should trigger this workflow.”
+
+👉 push:
+
+This means:
+
+Run the pipeline whenever someone pushes code to the repository.
+
+So this is your deployment trigger for direct code changes.
+
+📌 Branch filter under push
+    branches:
+      - main
+      - qa
+      - dev
+👉 branches:
+
+This restricts which branches can trigger the workflow.
+
+Line-by-line meaning:
+
+main → triggers pipeline when code is pushed to production branch
+qa → triggers pipeline for QA/testing environment
+dev → triggers pipeline for development environment
+
+👉 So:
+
+Push to dev → run dev pipeline
+Push to qa → run QA pipeline
+Push to main → run production deployment
+
+📌 Path filter under push
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/deploy-app.yml'
+👉 paths:
+
+This means:
+
+Only run the workflow if specific files/folders change
+
+Line-by-line meaning:
+
+'backend/**'
+→ triggers if ANY file inside backend changes
+
+'frontend/**'
+→ triggers if ANY file inside frontend changes
+
+'.github/workflows/deploy-app.yml'
+→ triggers if the workflow file itself is modified
+
+💡 Why this is important:
+
+Without paths, even a small README change could trigger full deployment.
+
+With paths, you optimize CI/CD so it runs only when needed.
+
+🔁 2. pull_request block (runs on PR events)
+
+pull_request:
+
+👉 Meaning:
+
+This triggers workflow when a Pull Request is created or updated.
+
+👉 This is used for:
+
+validation
+
+testing
+
+code quality checks before merging
+
+📌 Branch restriction for PRs
+
+branches:
+      - main
+      - qa
+      - dev
+Meaning:
+
+This workflow runs only if the PR is targeting:
+
+main
+qa
+dev
+
+👉 Example:
+
+PR → dev ✔ runs
+PR → main ✔ runs
+PR → some-feature-branch → ❌ may not run depending on target
+
+📌 PR event types
+    types: [opened, synchronize, reopened]
+
+👉 types: defines what kind of PR activity triggers the workflow
+
+Line-by-line:
+
+opened
+→ runs when a new pull request is created
+
+synchronize
+→ runs when new commits are pushed to the PR branch
+
+reopened
+→ runs when a previously closed PR is reopened
+
