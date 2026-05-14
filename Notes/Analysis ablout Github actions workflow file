@@ -1422,8 +1422,210 @@ This job does:
 7. Save coverage report
 
 
-
 ____________________________________________________________________________________________________________________________________________________________________________________________
 
 
+GITHUB ACTIONS CI/CD NOTES (CHEAT SHEET)
+🧠 1. WORKFLOW TRIGGERS
+🔵 push
+
+Runs when code is pushed.
+
+can filter branches:
+main → production
+dev → development
+qa → testing
+can filter files:
+paths:
+  - backend/**
+  - frontend/**
+
+👉 only runs if these files change
+
+🟡 pull_request
+
+Runs when PR is created/updated.
+
+👉 used for:
+
+testing
+validation
+lint checks
+
+❌ usually NOT used for deployment
+
+🟣 workflow_dispatch
+
+Manual trigger
+
+inputs:
+  environment:
+
+👉 allows user to choose:
+
+dev
+qa
+prod
+test
+🔐 2. PERMISSIONS BLOCK
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+🧠 Meaning:
+Permission	Meaning
+id-token	allow Azure OIDC login
+contents	repo access
+pull-requests	read/write PR metadata
+⚡ Important:
+read → view only
+write → modify PR, comments, checks
+🖥️ 3. RUNNERS (OS)
+runs-on: ubuntu-latest
+Options:
+OS	Use
+ubuntu	CI/CD, Docker, Node.js
+windows	.NET, PowerShell
+macos	iOS/macOS apps
+⚙️ 4. STEPS STRUCTURE
+steps:
+  - name: Step Name
+    run: command
+🔵 run:
+
+Executes shell commands
+
+🟢 run: |
+
+Multi-line bash script
+
+echo "A"
+echo "B"
+🟡 Alternatives:
+Type	Meaning
+`	`
+>	folded single line
+none	single command
+📦 5. CHECKOUT STEP
+uses: actions/checkout@v4
+🧠 Meaning:
+
+👉 Downloads full repository to runner
+
+✔ full repo clone
+✔ latest commit from branch
+✔ NOT partial changes
+
+📥 6. INSTALL DEPENDENCIES
+npm install vs npm ci
+Command	Meaning
+npm install	installs + updates package-lock
+npm ci	clean install (faster + strict)
+
+👉 CI/CD uses npm ci for consistency
+
+🧪 7. TEST COMMAND
+npm run test -- --ci --coverage
+Options:
+Flag	Meaning
+--ci	CI mode (no watch)
+--coverage	generate coverage report
+--json	output JSON
+--maxWorkers=2	limit CPU usage
+🧵 8. WORKERS (IMPORTANT)
+--maxWorkers=2
+🧠 Meaning:
+
+Number of CPU threads used for tests
+
+🔥 Higher workers:
+
+✔ faster tests
+❌ more CPU usage
+
+Example:
+Workers	Effect
+2	safe CI default
+10	faster but heavy load
+📊 9. ARTIFACTS
+actions/upload-artifact
+🧠 Meaning:
+
+Saves files after job ends
+
+Examples:
+
+test reports
+coverage reports
+🔐 10. AZURE LOGIN (OIDC)
+uses: azure/login@v2
+Required inputs:
+Field	Meaning
+client-id	Azure App identity
+tenant-id	Azure directory
+subscription-id	Azure account scope
+🧠 FLOW:
+
+GitHub → Azure AD → OIDC token → login
+
+🏗️ 11. ENVIRONMENT GENERATION STEP
+Purpose:
+
+👉 Convert branch → deployment config
+
+Example mapping:
+Branch	Env
+main	prod
+dev	dev
+qa	qa
+Output examples:
+resource group
+container apps
+domains
+key vault
+storage account
+🌐 12. SMOKE TESTS
+🧠 Meaning:
+
+Quick post-deploy check
+
+Checks:
+backend responds (200)
+frontend loads (200/307)
+Purpose:
+
+✔ verify deployment is alive
+✔ detect broken release
+
+⚠️ 13. WARNINGS vs FAILURES
+Type	Effect
+echo warning	just UI message
+exit 1	fails job
+needs	controls job order
+🔗 14. JOB DEPENDENCY
+needs: [job1, job2]
+
+👉 ensures order of execution
+
+📤 15. OUTPUTS
+echo "key=value" >> $GITHUB_OUTPUT
+🧠 Meaning:
+
+Pass values to next jobs
+
+🧠 FINAL MENTAL MODEL
+
+Think of GitHub Actions like:
+
+🏭 Assembly line:
+
+Trigger → Start workflow
+Checkout → Get code
+Test → Validate
+Build → Package
+Deploy → Release
+Smoke test → Verify
+🚀 ONE-LINE SUMMARY
+
+GitHub Actions is a pipeline system where triggers start workflows, jobs run on selected OS, steps execute shell scripts or actions, and outputs pass data between jobs for deployment automation.
 
