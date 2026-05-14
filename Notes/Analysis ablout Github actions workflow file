@@ -868,3 +868,562 @@ synchronize
 reopened
 → runs when a previously closed PR is reopened
 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - dev
+          - qa
+          - test
+          - prod
+
+_____________________________________
+
+What this block is
+
+workflow_dispatch:
+👉 Meaning:
+
+This enables manual triggering of the workflow from GitHub UI or API.
+
+Without this:
+
+Workflow runs only on push, pull_request, etc.
+
+With this:
+
+You can click “Run workflow” button in GitHub and choose options.
+
+👉 In short:
+
+It adds a manual “deploy button” for your CI/CD pipeline.
+
+🧩 Inputs section
+
+inputs:
+👉 Meaning:
+
+This defines parameters you can pass when manually running the workflow.
+
+👉 Think of it like:
+
+“User input form for deployment”
+
+🎯 Input: environment
+
+environment:
+👉 Meaning:
+
+This is the name of the input variable.
+
+You will later use it in workflow like:
+
+${{ github.event.inputs.environment }}
+
+👉 It tells the pipeline:
+
+Which environment to deploy to (dev/qa/prod/etc.)
+
+📝 Description
+
+description: 'Deployment environment'
+👉 Meaning:
+
+This is just a UI label in GitHub Actions page
+
+It helps users understand:
+
+“What does this input mean?”
+
+So when someone clicks “Run workflow”, they see:
+👉 Deployment environment
+
+❗ Required flag
+required: true
+
+👉 Meaning:
+
+This means:
+
+User MUST select or confirm a value before running workflow
+
+If false → GitHub can use default automatically.
+
+🟡 Default value
+default: 'test'
+
+👉 Meaning:
+If user does NOT choose anything, GitHub will use:
+
+👉 test
+So pipeline will assume:
+
+“Run in test environment”
+
+🎛️ Input type
+type: choice
+👉 Meaning:
+
+This restricts input to a dropdown selection in GitHub UI
+
+Other types include:
+
+string → free text input
+boolean → true/false checkbox
+number → numeric input
+choice → dropdown menu (your case)
+
+👉 So here user cannot type anything random.
+
+📌 Allowed options
+options:
+  - dev
+  - qa
+  - test
+  - prod
+👉 Meaning:
+
+These are the only valid values user can choose
+
+So dropdown becomes:
+
+dev
+qa
+test
+prod
+🔥 How it looks in real life
+
+When you go to GitHub Actions → “Run workflow”, you will see:
+
+👉 Environment (dropdown):
+
+dev
+qa
+test
+prod
+
+Then you click:
+✔ Run workflow
+
+🚀 Why this is used in CI/CD pipelines
+
+This block is used for:
+
+1. Manual deployments
+Deploy anytime without pushing code
+
+2. Controlled releases
+Choose environment manually (safe for prod)
+
+3. Emergency fixes
+Quick redeploy without new commit
+
+4. Testing flexibility
+Run same pipeline in dev/qa/prod
+
+_________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+
+# OIDC permissions for Azure authentication
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+----------------------------------------
+
+
+Simple mental model :
+
+Permission	                Think of it as
+
+id-token	                   “Can I login to cloud?”
+contents	                   “Can I touch repo code?”
+pull-requests	               “Can I interact with PR system?”
+
+
+
+Meaning of each permission
+1. id-token
+👉 Purpose:
+
+Used for OIDC (OpenID Connect) authentication
+
+This is what allows GitHub to login to Azure without secrets.
+
+🔹 id-token: write
+
+Means:
+
+GitHub can generate a secure token for cloud login (Azure/AWS/GCP)
+
+✔ Required for:
+
+Azure OIDC login (az login --federated-token)
+
+GitHub → Azure authentication without secrets
+🔹 id-token: read
+
+Means:
+
+Workflow can only read existing identity token, but NOT generate one
+
+❌ Usually NOT enough for Azure login
+
+⚠️ Impact:
+
+Setting	Azure OIDC Login
+
+write	✅ Works
+read	❌ Fails
+
+
+📦 2. contents
+
+Controls access to your repository code
+
+🔹 contents: read
+
+Means:
+
+Can clone repository
+Can read files
+Can build code
+
+❌ Cannot:
+
+push changes
+commit back to repo
+
+✔ Used for:
+
+CI builds
+Docker image creation
+testing pipelines
+
+🔹 contents: write
+
+Means:
+
+Can push commits
+Can modify files in repo
+Can tag releases
+
+✔ Used for:
+
+auto version bumping
+release pipelines
+CI that pushes build artifacts back
+
+______________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+💬 3. pull-requests
+
+Controls interaction with PR system
+
+🔹 pull-requests: read
+
+Means:
+
+Can read PR metadata
+Cannot comment or modify PR
+🔹 pull-requests: write
+
+Means:
+
+Can add comments to PR
+Can update PR status checks
+Can approve/label PRs (depending on token scope)
+
+✔ Used for:
+
+CI status updates
+PR comments like “build succeeded”
+automated review bots
+
+
+
+
+___________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+env:
+  AZURE_CONTAINER_REGISTRY: acrall1rwai
+  BACKEND_IMAGE: hsbackimage
+  BACKEND_IMAGE_TAG: v1
+  FRONTEND_IMAGE: hsfrontimage
+  FRONTEND_IMAGE_TAG: v1
+
+jobs:
+  # Run backend tests
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+        continue-on-error: true  # TODO: Fix upstream lint issues
+
+      - name: Run Unit Tests
+        working-directory: backend
+        run: npm run test -- --ci --coverage --maxWorkers=2 --json --outputFile=test-results.json
+        continue-on-error: true  # TODO: Fix upstream test failures
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: backend/test-results.json
+          retention-days: 7
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+          retention-days: 7
+
+---------------------------------------------------------------------------------
+
+GLOBAL env BLOCK : 
+
+env:
+👉 Meaning:
+
+This defines global environment variables for the entire workflow/job scope.
+
+These values can be reused anywhere in the pipeline.
+
+⚙️ JOB: test-backend : 
+
+jobs:
+  test-backend:
+
+👉 Meaning:
+This defines a separate CI job named test-backend.
+
+✔ Runs independently in GitHub Actions runner.
+
+💻 Runner
+runs-on: ubuntu-latest
+
+👉 Meaning:
+
+GitHub gives a fresh Linux VM (Ubuntu)
+
+All steps run inside it
+
+✔ Clean environment every time
+
+🪜 STEP-BY-STEP BREAKDOWN : 
+
+1. Checkout code
+- name: Checkout code
+  uses: actions/checkout@v4
+
+👉 Meaning:
+
+Downloads your repository into the VM.
+
+Without this:
+❌ No code available in runner
+
+✔ With this:
+
+backend/
+frontend/
+workflows/
+
+become accessible
+
+🟢 2. Setup Node.js
+- name: Setup Node.js
+  uses: actions/setup-node@v4
+
+👉 Meaning:
+
+Installs Node.js in the runner.
+
+Configuration:
+node-version: '18'
+
+👉 Uses Node.js v18
+
+cache: 'npm'
+
+👉 Enables dependency caching
+
+✔ Speeds up builds
+
+cache-dependency-path: backend/package-lock.json
+
+👉 Tells GitHub:
+
+Use backend dependencies for caching
+
+✔ Prevents reinstalling packages every time
+
+📦 3. Install Dependencies
+- name: Install Dependencies
+  working-directory: backend
+  run: npm install
+
+👉 Meaning:
+
+Moves into backend folder
+Installs Node packages from package.json
+
+👉 Equivalent to:
+
+cd backend
+npm install
+
+🧹 4. Lint step
+
+- name: Lint
+  working-directory: backend
+  run: npm run lint
+
+👉 Meaning:
+
+Runs code quality checks
+
+✔ Finds:
+
+syntax issues
+style problems
+bad patterns
+
+⚠️ Important line:
+continue-on-error: true
+
+👉 Meaning:
+
+Even if lint fails, pipeline continues
+
+✔ Why used:
+
+You already know lint issues exist
+Don’t block CI/CD pipeline yet
+
+⚠️ But ideally should be fixed later
+
+🧪 5. Run Unit Tests
+- name: Run Unit Tests
+
+👉 Meaning:
+
+Runs backend test suite
+
+run: npm run test -- --ci --coverage --maxWorkers=2 --json --outputFile=test-results.json
+
+Breakdown:
+
+--ci
+→ runs in CI mode (no watch mode)
+
+--coverage
+→ generates coverage report
+
+--maxWorkers=2
+→ limits CPU usage
+
+--json
+→ outputs structured results
+
+--outputFile=test-results.json
+→ saves test results file
+continue-on-error: true
+
+👉 Meaning:
+
+Even if tests fail → pipeline continues
+
+✔ Usually used in early-stage pipelines
+
+📤 6. Upload Test Results
+- name: Upload Test Results
+  uses: actions/upload-artifact@v4
+
+👉 Meaning:
+Saves test results so you can download them later.
+
+if: always()
+
+👉 Meaning:
+
+Upload even if previous step failed
+
+✔ Important for debugging failures
+
+with:
+  name: backend-test-results
+
+👉 Name of artifact in GitHub UI
+
+path: backend/test-results.json
+
+👉 File being uploaded
+
+retention-days: 7
+
+👉 Keeps artifact for 7 days only
+
+📊 7. Upload Coverage Report
+- name: Upload Coverage Report
+  uses: actions/upload-artifact@v4
+
+👉 Uploads test coverage data
+
+name: backend-coverage
+
+👉 Artifact name
+
+path: backend/coverage
+
+👉 Uploads entire coverage folder
+
+retention-days: 7
+
+
+BIG PICTURE FLOW : 
+
+This job does:
+
+1. Get code
+2. Setup Node.js
+3. Install dependencies
+4. Lint code
+5. Run tests
+6. Save test results
+7. Save coverage report
+
+
+
+____________________________________________________________________________________________________________________________________________________________________________________________
+
+
+
