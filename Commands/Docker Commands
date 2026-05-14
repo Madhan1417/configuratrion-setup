@@ -218,3 +218,20 @@ docker network ls
 Check Docker Volumesb : 
 
 docker volume ls
+
+
+-------------------------------------------------------------------------------
+
+
+COntainers are Isolated Environments, If we can each Container to talk to ech other we need to Create a Network for them...... ( e.g Frontend & Backend )
+For that Use these Commands..!!
+
+# Step 1 - Create the network
+docker network create auth-network
+
+# Step 2 - Connect both containers to it
+docker network connect auth-network frontendcontainer
+docker network connect auth-network backendcontainer
+
+# Step 3 - Verify both are connected
+docker network inspect auth-network
