@@ -1,0 +1,38 @@
+Create Production Reverse Proxy
+
+Create config:
+
+sudo nano /etc/nginx/sites-available/azurewatch
+
+Paste:
+
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+Enable Site
+sudo ln -s /etc/nginx/sites-available/azurewatch /etc/nginx/sites-enabled/
+Remove Default Config
+sudo rm /etc/nginx/sites-enabled/default
+Test NGINX
+sudo nginx -t
+
+Expected:
+
+syntax is ok
+test is successful
+Reload NGINX
+sudo systemctl reload nginx
+FINAL TEST
+
+Now open:
+
+http://<VM-PUBLIC-IP>
