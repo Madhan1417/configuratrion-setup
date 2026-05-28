@@ -1,0 +1,34 @@
+Install AWS CLI in EC2
+-----------------------
+
+Check first by using this Command :
+------------------------------------
+aws --version
+
+If not installed:
+
+If your VM was Amazon Linux Use these commands to install AWS CLI :
+---------------------------------------------------------------------
+
+sudo yum install unzip -y
+
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+unzip awscliv2.zip
+
+sudo ./aws/install
+
+
+________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+if it was Ubuntu Vm then use these commands : 
+----------------------------------------------
+
+sudo yum install unzip -y
+
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+unzip awscliv2.zip
+
+sudo ./aws/install
