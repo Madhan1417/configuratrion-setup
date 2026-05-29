@@ -1,44 +1,98 @@
-Create Production Reverse Proxy
+Ahh yes — the issue happened because of this:
 
-Create config:
+rm default
 
-sudo nano /etc/nginx/sites-available/default
+You deleted the actual Nginx config file 😄
+and then created a symbolic link pointing back to itself:
 
-Paste:
+/etc/nginx/sites-available/myweb
+   -> /etc/nginx/sites-available/default
+
+But default itself no longer exists.
+
+That’s why:
+
+Too many levels of symbolic links
+
+and Nginx failed to start.
+
+Fix Properly 🚀
+Step 1 — Remove Broken Symlink
+
+Run:
+
+sudo rm /etc/nginx/sites-available/myweb
+Step 2 — Recreate Proper Nginx Config
+
+Create new config file:
+
+sudo nano /etc/nginx/sites-available/myweb
+
+Paste this:
 
 server {
     listen 80;
     server_name _;
 
-    location / {
-        proxy_pass http://127.0.0.1:5000;
+    root /opt/dump-task/sarab;
 
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
     }
 }
 
+Save:
 
-Enable Site :
+CTRL + O
+Enter
+CTRL + X
+Step 3 — Enable Site
 
-sudo ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+Now create symlink correctly:
 
-Remove Default Config
+sudo ln -s /etc/nginx/sites-available/myweb /etc/nginx/sites-enabled/
+Step 4 — Remove Old Broken Symlink (if exists)
+
+Check:
+
+ls /etc/nginx/sites-enabled/
+
+If you see default, remove it:
 
 sudo rm /etc/nginx/sites-enabled/default
+Step 5 — Test Nginx Config
 
-Test NGINX
+VERY IMPORTANT:
+
 sudo nginx -t
 
-Expected:
+If successful, you’ll see:
 
 syntax is ok
 test is successful
-Reload NGINX
-sudo systemctl reload nginx
-FINAL TEST
+Step 6 — Start Nginx
+sudo systemctl start nginx
 
-Now open:
+Then:
 
-http://<VM-PUBLIC-IP>
+sudo systemctl enable nginx
+
+Then verify:
+
+sudo systemctl status nginx
+
+You should see:
+
+active (running)
+Step 7 — Fix Permissions
+sudo chmod -R 755 /opt/dump-task/sarab
+sudo chown -R www-data:www-data /opt/dump-task/sarab
+Step 8 — Open Browser
+
+Visit:
+
+http://YOUR_PUBLIC_IP
+
+Now your frontend page should load 🎉
