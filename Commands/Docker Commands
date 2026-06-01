@@ -1,49 +1,67 @@
-# Build image
-docker build -t myapp:v1 .
+Build image ::
 
-# Run container
-docker run -d -p 3000:3000 --name mycontainer myapp:v1
-
-# Check logs
-docker logs -f mycontainer
-
-# Test app
-curl http://localhost:3000
-
-# Login docker hub
-docker login
-
-# Tag image
-docker tag myapp:v1 username/myapp:v1
-
-# Push image
-docker push username/myapp:v1
-
-# Azure login
-az login
-
-# ACR login
-az acr login --name myacr
-
-# Tag for ACR
-docker tag myapp:v1 myacr.azurecr.io/myapp:v1
-
-# Push to ACR
-docker push myacr.azurecr.io/myapp:v1
+*  docker build -t myapp:v1 .
 
 
+Run container ::
 
-1. Check Docker Installed 
+*   docker run -d -p 3000:3000 --name mycontainer myapp:v1
 
-docker --version
+Check logs ::
+
+*   docker logs -f mycontainer
+
+Test app ::
+
+*   curl http://localhost:3000
+
+Login docker hub ::
+
+*   docker login
+
+Tag image ::
+
+*   docker tag myapp:v1 username/myapp:v1
+
+Push image ::
+
+*   docker push username/myapp:v1
+
+
+----------------------------------------------
+
+Azure login for ( ACR )::
+
+*   az login
+
+ACR login ::
+
+*   az acr login --name myacr
+
+Tag for ACR ::
+
+*   docker tag myapp:v1 myacr.azurecr.io/myapp:v1
+
+Push to ACR ::
+
+*   docker push myacr.azurecr.io/myapp:v1
+
+
+-----------------------------------------------
+
+1. Check Docker Installed ::
+
+*  docker --version
 
 let's see What it does
 
 Checks whether Docker is installed and working.
 
+-------------------------------------------------
+
 2. Build Docker Image ::
 
-docker build -t myapp:v1 .
+*  docker build -t myapp:v1 .
 
 What it does
 
@@ -59,11 +77,13 @@ v1 → version/tag
 
 Example :::
 
-docker build -t node-api:v1 .
+*  docker build -t node-api:v1 .
+
+-----------------------------------------------
 
 3. Check Built Images :::
 
-docker images
+*   docker images
 
 What it does:::
 
@@ -73,7 +93,7 @@ Lists all Docker images in your system.
 
 4. Run Container ::
 
-docker run -d -p 3000:3000 --name mycontainer myapp:v1
+*   docker run -d -p 3000:3000 --name mycontainer myapp:v1
 
 What it does
 
@@ -93,7 +113,7 @@ myapp:v1 → image name
 
 5. Check Running Containers
 
-docker ps
+*  docker ps
 
 What it does
 
@@ -103,7 +123,7 @@ Shows running containers.
 
 6. Check All Containers
 
-docker ps -a
+*  docker ps -a
 
 What it does
 
@@ -114,21 +134,22 @@ Shows running + stopped containers.
 
 7. View Container Logs
 
-docker logs mycontainer
+*  docker logs mycontainer
 
 What it does
 
 Displays application logs inside container.
 
 to see Live Logs use this commands ::
-docker logs -f mycontainer
+
+*  docker logs -f mycontainer
 
 -------------------------------------------------
 
 
 8. Enter Inside Container ::
 
-docker exec -it mycontainer bash
+*  docker exec -it mycontainer bash
 
 What it does
 
@@ -136,13 +157,13 @@ Opens terminal inside running container.
 
 If bash not available
 
-docker exec -it mycontainer sh
+*  docker exec -it mycontainer sh
 
 ----------------------------------------------
 
 9. Stop Container ::
 
-docker stop mycontainer
+*   docker stop mycontainer
 
 What it does
 
@@ -153,7 +174,7 @@ Stops running container.
 
 10. Start Existing Container ::
 
-docker start mycontainer
+*   docker start mycontainer
 
 What it does
 
@@ -165,7 +186,7 @@ Starts stopped container.
 
 11. Restart Container ::
 
-docker restart mycontainer
+*  docker restart mycontainer
 
 What it does
 
@@ -176,7 +197,7 @@ Restarts container.
 
 12. Remove Container ::
 
-docker rm mycontainer
+*  docker rm mycontainer
 
 What it does
 
@@ -184,13 +205,13 @@ Deletes container.
 
 Force Remove ::
 
-docker rm -f mycontainer
+*  docker rm -f mycontainer
 
 --------------------------------------------------------
 
 13. Remove Image ::
 
-docker rmi myapp:v1
+*  docker rmi myapp:v1
 
 
 What it does :
@@ -213,7 +234,7 @@ http://localhost:3000
 
 Docker Hub Login :
 
-docker login
+*  docker login
 
 What it does
 
@@ -224,74 +245,126 @@ Authenticates with Docker Hub.
 
 16. Tag Image for Docker Hub ::
 
-docker tag myapp:v1 username/myapp:v1
-Example
-docker tag myapp:v1 madhan1417/myapp:v1
+*  docker tag myapp:v1 username/myapp:v1
+
+Example :
+
+*  docker tag myapp:v1 madhan1417/myapp:v1
+
 What it does
 
 Prepares image for Docker Hub push.
 
-17. Push to Docker Hub
-docker push username/myapp:v1
-Example
-docker push madhan1417/myapp:v1
+
+-------------------------------------------------
+
+17. Push to Docker Hub ::
+
+*  docker push username/myapp:v1
+
+Example :
+
+*  docker push madhan1417/myapp:v1
+
 What it does
 
 Uploads image to Docker Hub.
 
-18. Pull Image Anywhere
-docker pull username/myapp:v1
+----------------------------------------------------
+
+
+18. Pull Image Anywhere ::
+
+* docker pull username/myapp:v1
+
 What it does
 
 Downloads image from Docker Hub.
 
-19. Azure ACR Login
+
+------------------------------------------------------
+
+19. Azure ACR Login ::
 
 Login Azure:
 
-az login
+*   az login --use-device-code
 
 Login ACR:
 
-az acr login --name myacrname
+*  az acr login --name myacrname
+
+
 What it does
 
 Authenticates Docker with Azure Container Registry.
 
-20. Tag Image for ACR
-docker tag myapp:v1 myacrname.azurecr.io/myapp:v1
-Example
-docker tag myapp:v1 madhanacr.azurecr.io/myapp:v1
-21. Push to Azure ACR
-docker push myacrname.azurecr.io/myapp:v1
-What it does
+
+--------------------------------------------------------
+
+20. Tag Image for ACR ::
+
+*  docker tag myapp:v1 myacrname.azurecr.io/myapp:v1
+
+Example :
+
+*  docker tag myapp:v1 madhanacr.azurecr.io/myapp:v1
+
+-----------------------------------------------------------
+
+
+21. Push to Azure ACR ::
+
+*  docker push myacrname.azurecr.io/myapp:v1
+
+What it does :
 
 Uploads image to Azure Container Registry.
 
-22. Verify Images in ACR
-az acr repository list --name myacrname --output table
-23. Pull from ACR
-docker pull myacrname.azurecr.io/myapp:v1
-24. Useful Cleanup Commands
-Remove all stopped containers
-docker container prune
-Remove unused images
-docker image prune
-Remove everything unused
-docker system prune -a
+
+---------------------------------------------------------------
+
+22. Verify Images in ACR ::
+
+*   az acr repository list --name myacrname --output table
+
+
+---------------------------------------------------------------
+
+23. Pull from ACR ::
+
+*   docker pull myacrname.azurecr.io/myapp:v1
+
+
+-------------------------------------------------------------------
+
+24. Useful Cleanup Commands ::
+
+Remove all stopped containers :
+
+*  docker container prune
+
+Remove unused images :
+
+*  docker image prune
+
+Remove everything unused :
+
+*  docker system prune -a
 
 ⚠️ Be careful — deletes unused containers/images/networks.
 
 
+-------------------------------------------------------------------------
 
 Check Docker Networks : 
 
-docker network ls
+*   docker network ls
 
 
 Check Docker Volumesb : 
 
-docker volume ls
+*   docker volume ls
 
 
 -------------------------------------------------------------------------------
@@ -300,14 +373,18 @@ docker volume ls
 COntainers are Isolated Environments, If we can each Container to talk to ech other we need to Create a Network for them...... ( e.g Frontend & Backend )
 For that Use these Commands..!!
 
-# Step 1 - Create the network
-docker network create auth-network
+Step 1 - Create the network
 
-# Step 2 - Connect both containers to it
+*  docker network create auth-network
+
+Step 2 - Connect both containers to it :
+
 docker network connect auth-network frontendcontainer
+
 docker network connect auth-network backendcontainer
 
-# Step 3 - Verify both are connected
+Step 3 - Verify both are connected :
+
 docker network inspect auth-network
 
 
@@ -315,16 +392,19 @@ docker network inspect auth-network
 -----------------------------------------------------------------------------
 
 
-Docker Container Recovery Quick Notes
+Docker Container Recovery Quick Notes :
 
 1. Check whether Docker Engine / Docker Desktop is running on the VM.
 
-   * If Docker is stopped, open Docker Desktop and start it.
-   * Sometimes simply opening Docker Desktop will start the Docker Engine automatically.
+If Docker is stopped, open Docker Desktop and start it.
+Sometimes simply opening Docker Desktop will start the Docker Engine automatically.
+
+
+
 
 2. Check container status:
 
-   docker ps -a
+   *  docker ps -a
 
    If the container exists but is in Exited state, start it:
 
@@ -332,31 +412,39 @@ Docker Container Recovery Quick Notes
 
    Example:
 
-   docker start sarab-container
+   *  docker start sarab-container
+
+
+
 
 3. Verify the container is running:
 
-   docker ps
+   *   docker ps
+
+
 
 4. If needed, access the running container:
 
-   docker exec -it <container-name> sh
+   *  docker exec -it <container-name> sh
+
+
+
 
 5. To prevent containers from staying stopped after Docker Engine restarts, configure a restart policy:
 
-   docker update --restart unless-stopped <container-name>
+   *   docker update --restart unless-stopped <container-name>
 
    Example:
 
-   docker update --restart unless-stopped sarab-container
+   *   docker update --restart unless-stopped sarab-container
 
    Other options:
 
-   * always
-   * unless-stopped
-   * on-failure
+   always
+   unless-stopped
+   on-failure
 
 This issue commonly occurs after Docker Desktop, Docker Engine, WSL, or the VM is restarted. The container still exists but needs to be started again unless a restart policy is configured.
 
 
-__________________________________________________________________________________________________
+___________________________________________________________________________________________________________________________________________________________________________________________________________________
