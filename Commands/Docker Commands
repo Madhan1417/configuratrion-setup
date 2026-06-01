@@ -33,34 +33,48 @@ docker push myacr.azurecr.io/myapp:v1
 
 
 
-1. Check Docker Installed
+1. Check Docker Installed 
+
 docker --version
-What it does
+
+let's see What it does
 
 Checks whether Docker is installed and working.
 
-2. Build Docker Image
+2. Build Docker Image ::
+
 docker build -t myapp:v1 .
+
 What it does
 
 Builds a Docker image from your Dockerfile.
 
-Breakdown
+Breakdown explaation :::
+
 build → create image
 -t → tag/name the image
 myapp → image name
 v1 → version/tag
 . → current folder contains Dockerfile
-Example
+
+Example :::
+
 docker build -t node-api:v1 .
-3. Check Built Images
+
+3. Check Built Images :::
+
 docker images
-What it does
+
+What it does:::
 
 Lists all Docker images in your system.
 
-4. Run Container
+-----------------------------------------------
+
+4. Run Container ::
+
 docker run -d -p 3000:3000 --name mycontainer myapp:v1
+
 What it does
 
 Runs your image as a container.
@@ -73,83 +87,143 @@ first 3000 → local machine port
 second 3000 → container port
 --name → custom container name
 myapp:v1 → image name
+
+
+--------------------------------------------------
+
 5. Check Running Containers
+
 docker ps
+
 What it does
 
 Shows running containers.
 
+--------------------------------------------------
+
 6. Check All Containers
+
 docker ps -a
+
 What it does
 
 Shows running + stopped containers.
 
+
+--------------------------------------------
+
 7. View Container Logs
+
 docker logs mycontainer
+
 What it does
 
 Displays application logs inside container.
 
-Live Logs
+to see Live Logs use this commands ::
 docker logs -f mycontainer
-8. Enter Inside Container
+
+-------------------------------------------------
+
+
+8. Enter Inside Container ::
+
 docker exec -it mycontainer bash
+
 What it does
 
 Opens terminal inside running container.
 
 If bash not available
+
 docker exec -it mycontainer sh
-9. Stop Container
+
+----------------------------------------------
+
+9. Stop Container ::
+
 docker stop mycontainer
+
 What it does
 
 Stops running container.
 
-10. Start Existing Container
+
+-----------------------------------------------
+
+10. Start Existing Container ::
+
 docker start mycontainer
+
 What it does
 
 Starts stopped container.
 
-11. Restart Container
+
+-------------------------------------------------
+
+
+11. Restart Container ::
+
 docker restart mycontainer
+
 What it does
 
 Restarts container.
 
-12. Remove Container
+
+----------------------------------------------------
+
+12. Remove Container ::
+
 docker rm mycontainer
+
 What it does
 
 Deletes container.
 
-Force Remove
+Force Remove ::
+
 docker rm -f mycontainer
-13. Remove Image
+
+--------------------------------------------------------
+
+13. Remove Image ::
+
 docker rmi myapp:v1
-What it does
+
+
+What it does :
 
 Deletes Docker image.
 
-14. Test Application
+
+-------------------------------------------------------
+
+14. To Test a Application in browser::
 
 Open browser:
 
 http://localhost:3000
 
-Or use curl:
 
-curl http://localhost:3000
-15. Docker Login
-Docker Hub Login
+-----------------------------------------------------
+
+15. Docker Login ::
+
+Docker Hub Login :
+
 docker login
+
 What it does
 
 Authenticates with Docker Hub.
 
-16. Tag Image for Docker Hub
+
+-----------------------------------------------------
+
+16. Tag Image for Docker Hub ::
+
 docker tag myapp:v1 username/myapp:v1
 Example
 docker tag myapp:v1 madhan1417/myapp:v1
@@ -235,3 +309,54 @@ docker network connect auth-network backendcontainer
 
 # Step 3 - Verify both are connected
 docker network inspect auth-network
+
+
+
+-----------------------------------------------------------------------------
+
+
+Docker Container Recovery Quick Notes
+
+1. Check whether Docker Engine / Docker Desktop is running on the VM.
+
+   * If Docker is stopped, open Docker Desktop and start it.
+   * Sometimes simply opening Docker Desktop will start the Docker Engine automatically.
+
+2. Check container status:
+
+   docker ps -a
+
+   If the container exists but is in Exited state, start it:
+
+   docker start <container-name>
+
+   Example:
+
+   docker start sarab-container
+
+3. Verify the container is running:
+
+   docker ps
+
+4. If needed, access the running container:
+
+   docker exec -it <container-name> sh
+
+5. To prevent containers from staying stopped after Docker Engine restarts, configure a restart policy:
+
+   docker update --restart unless-stopped <container-name>
+
+   Example:
+
+   docker update --restart unless-stopped sarab-container
+
+   Other options:
+
+   * always
+   * unless-stopped
+   * on-failure
+
+This issue commonly occurs after Docker Desktop, Docker Engine, WSL, or the VM is restarted. The container still exists but needs to be started again unless a restart policy is configured.
+
+
+__________________________________________________________________________________________________
