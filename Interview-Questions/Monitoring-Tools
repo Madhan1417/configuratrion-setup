@@ -1,0 +1,58 @@
+Prometheus is an open-source monitoring system that collects metrics from applications, servers, and infrastructure components. It works on a pull-based model, where Prometheus periodically scrapes metrics from targets exposed through HTTP endpoints. For systems that don't expose metrics natively, exporters are used. For example, Node Exporter is commonly installed on Linux servers to expose CPU, memory, disk, and network metrics, while other exporters such as MySQL Exporter or NGINX Exporter expose application-specific metrics. Prometheus stores these metrics as time-series data and allows querying them using PromQL.
+
+
+
+Then continue with Grafana and Datadog:
+
+Grafana sits on top of Prometheus and other data sources to visualize metrics through dashboards and alerts. It does not collect metrics itself.
+
+Datadog is a managed observability platform where agents are installed on servers or Kubernetes clusters to collect metrics, logs, and traces, which are then sent to the Datadog cloud platform for monitoring and analysis.
+
+
+
+Interview-Level Architecture Explanation
+Linux Server
+     │
+     ▼
+Node Exporter
+     │
+ exposes /metrics
+     │
+     ▼
+Prometheus
+(scrapes every 15s/30s)
+     │
+stores time-series data
+     │
+     ▼
+Grafana
+(dashboards & alerts)
+
+
+
+For Datadog:
+=============
+
+
+Linux Server
+     │
+     ▼
+Datadog Agent
+     │
+Pushes metrics/logs/traces
+     │
+     ▼
+Datadog Cloud Platform
+     │
+     ▼
+Dashboards, Alerts, APM
+
+
+
+How does Prometheus collect CPU and memory metrics from a Linux server?
+
+Good answer:
+
+Prometheus cannot directly read server metrics. We install Node Exporter on the Linux server, which exposes system metrics through a /metrics endpoint. Prometheus is configured with the target server address and periodically scrapes those metrics. The collected data is stored as time-series data and can then be visualized in Grafana.
+
+
